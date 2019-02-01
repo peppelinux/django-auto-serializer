@@ -36,37 +36,43 @@ sit = SerializableInstanceTree(bando, excluded_fields=['created', 'modified'],
                                change_uniques = True,
                                duplicate = True)
 sit.serialize_tree()
+````
 
+## Some coding hints
+````
+import pprint
 # all the fields
-# bando._meta._forward_fields_map
+bando._meta._forward_fields_map
 
 # childrens here
-# bando._meta.fields_map
-## bando._meta.related_objects
+bando._meta.fields_map
+bando._meta.related_objects
 
 # another way with NestedObjects
-# from django.contrib.admin.utils import NestedObjects
-# from django.db import DEFAULT_DB_ALIAS
+from django.contrib.admin.utils import NestedObjects
+from django.db import DEFAULT_DB_ALIAS
 
 # get json with pk and autofilled fields as they are
-# from django.core import serializers
-# serializers.serialize('json', [bando], ensure_ascii=False)
+from django.core import serializers
+serializers.serialize('json', [bando], ensure_ascii=False)
 
-# serializers.serialize() relies on it
-# model_to_dict(bando)
+# serializers.serialize() relies on
+model_to_dict(bando)
 
-#pprint(sit.dict)
-# for i in sit.dict['childrens']:
-    # if i['model_name'] == 'IndicatorePonderato':
-        # pprint(i)
+pprint(sit.dict)
+for i in sit.dict['childrens']:
+    if i['model_name'] == 'IndicatorePonderato':
+        pprint(i)
         
-# tree_to_str = json.dumps(si.dict, indent=2)
-# jsonstr_to_dict = json.loads(tree_to_str)
-# pprint(jsonstr_to_dict )
+tree_to_str = json.dumps(si.dict, indent=2)
+jsonstr_to_dict = json.loads(tree_to_str)
+pprint(jsonstr_to_dict )
 
+## Import dump
+````
 isi = ImportableSerializedInstance(si.dict)
 isi.save()
-# print(isi.json())
+print(isi.json())
 ````
 
 ## A simple view to import a json dump
