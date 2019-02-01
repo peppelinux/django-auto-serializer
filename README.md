@@ -8,7 +8,8 @@ Django-auto-serializer will do for you:
 - recursively serialize all FK childrens;
 - can ignore some child if you tell him how they are called (see examples above);
 - M2M auto serialization;
-- ignore or not autofields import/export (auto_now_add, slugfields...);
+- ignore or not autofields import/export (auto_now_add...);
+- regenerates unique if needed, asslugfields (change_uniques = True,);
 - Import a serialized Object tree, it will build up everything as before;
 
 
