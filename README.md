@@ -12,6 +12,10 @@ Django-auto-serializer will do for you:
 - regenerates unique if needed, asslugfields (change_uniques = True,);
 - Import a serialized Object tree, it will build up everything as before;
 
+## Setup
+````
+pip install git+https://github.com/peppelinux/django-auto-serializer.git
+````
 
 ## Usage Example
 ````
