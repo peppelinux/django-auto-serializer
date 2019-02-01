@@ -1,7 +1,7 @@
 # django-auto-serializer
-Django app that automates objects tree serialization recursively, wihtout any declaration.
+Django app that automates objects tree serialization recursively, without any declaration.
 
-Define new classes for every Object serialization could sound a bit boring, so I coded this way to do the things.
+Define new classes for every Object serialization could sound a bit boring, I coded this way to do the things automagically. 
 Django-auto-serializer will do for you:
 
 - Json serialization (export);
