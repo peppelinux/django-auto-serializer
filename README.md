@@ -69,6 +69,24 @@ isi.save()
 # print(isi.json())
 ````
 
+## A simple view to import a json dump
+````
+@user_passes_test(lambda u:u.is_staff)
+def import_file(request):
+    file_to_import = request.FILES.get('file_to_import')
+    # content here
+    url = reverse('admin:gestione_peo_bando_changelist')
+    if not file_to_import:
+        return HttpResponseRedirect(url)
+    if not file_to_import:
+        # scrivi un messaggio di errore
+        pass
+    jcont = json.loads(request.FILES['file_to_import'].read().decode(settings.DEFAULT_CHARSET))
+    isi = ImportableSerializedInstance(jcont)
+    isi.save()
+    return HttpResponseRedirect(url)
+````
+
 ## Result
 ````
 {
