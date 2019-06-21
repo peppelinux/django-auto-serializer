@@ -1,15 +1,15 @@
 # Django auto-serializer
-Django app that automates objects tree serialization recursively, without any declaration.
+Django app that automates objects tree serialization recursively, without any declarations.
 
-Define new classes for every Object serialization could sound a bit boring, I coded this way to do the things automagically. 
+Define new classes for every Object serialization could sound a bit boring, I coded this app to do the things automagically. 
 Django-auto-serializer will do for you:
 
 - Json serialization (export);
 - recursively serialize all FK childrens;
-- can ignore some child if you tell him how they are called (see examples above);
+- can ignore some children if you tell him how they are named (see examples above);
 - M2M auto serialization;
 - ignore or not autofields import/export (auto_now_add...);
-- regenerates unique if needed, asslugfields (change_uniques = True,);
+- regenerates unique if needed, the same for slugfields (change_uniques = True,);
 - Import a serialized Object tree, it will build up everything as before;
 
 ## Setup
