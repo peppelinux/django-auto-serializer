@@ -31,17 +31,17 @@ class BaseSerializableInstance(object):
         del(self.dict['object'][related_field])
         del(self.dict['object'][related_field+'_id'])
         return related_field
-    
+
     def json(self, indent=2):
         return json.dumps(self.dict, indent=indent)
 
     def app_model(self, app_name, model_name):
         """
-        Returns model class 
+        Returns model class
         """
         return apps.get_model(app_label=app_name, model_name=model_name)
-        
-    
+
+
 class SerializableInstance(BaseSerializableInstance):
     def __init__(self, obj,
                  excluded_fields=['created', 'modified'],
@@ -75,8 +75,9 @@ class SerializableInstance(BaseSerializableInstance):
 
         self.duplicate = duplicate
         self.excluded_childrens = excluded_childrens
-        
+
         self.dict = {
+            'source_pk': obj.pk,
             'app_name': obj._meta.app_label,
             'model_name': obj._meta.object_name,
             'object': {},
@@ -88,7 +89,7 @@ class SerializableInstance(BaseSerializableInstance):
 
     def get_serialized_value(self, obj, ofield):
         """
-        
+
         """
         # everything to string for the first time
         value = ofield.value_to_string(obj)
@@ -103,7 +104,7 @@ class SerializableInstance(BaseSerializableInstance):
             value = ofield.value_from_object(obj)
         # specify others types here if needed
         #
-        
+
         # M2M management
         if isinstance(ofield, ManyToManyField):
             # this way value become a collection
@@ -125,7 +126,7 @@ class SerializableInstance(BaseSerializableInstance):
                     value = value +'-'+uuid.uuid4().hex
                 elif type(value) == int:
                     value = uuid.uuid4().int
-        
+
         return value
 
     def exclude_field(self, field_name):
@@ -136,7 +137,7 @@ class SerializableInstance(BaseSerializableInstance):
         if field_name not in self.excluded_fields:
             self.excluded_fields.append(field_name)
             return True
-    
+
     def prepare_duplication(self):
         """
         filters out auto filed and pk
@@ -148,7 +149,7 @@ class SerializableInstance(BaseSerializableInstance):
                 if ofield.primary_key:
                     self.exclude_field(field)
                     continue
-            
+
             if not self.auto_fields:
                 # add others if needed
                 if hasattr(ofield, 'auto_now') or \
@@ -156,14 +157,14 @@ class SerializableInstance(BaseSerializableInstance):
                    if ofield.auto_now or ofield.auto_now_add:
                         self.exclude_field(field)
                         continue
-            
+
     def serialize_obj(self):
         """
-        
+
         """
         if self.duplicate:
             self.prepare_duplication()
-        
+
         for field in self.fields:
             if field in self.excluded_fields: continue
 
@@ -172,9 +173,23 @@ class SerializableInstance(BaseSerializableInstance):
                 self.dict['object'][field] = value
         return self.dict
 
-    def serialize_tree(self):
+    def remove_duplicates(self, tree={}, depth=0):
+        if not tree: tree=self.dict
+        childrens = tree['childrens']
+        for child in childrens:
+            self.remove_duplicates(tree=child, depth=depth+1)
+            if child['source_pk'] in self.depth_reference:
+                if child['depth'] < self.depth_reference[child['source_pk']]:
+                    child['save'] = False
+
+    def serialize_tree(self, depth=0, depth_reference={}):
         self.serialize_obj()
         childrens = self.childrens()
+        if self.obj.pk in depth_reference:
+            if depth > depth_reference[self.obj.pk]:
+                depth_reference[self.obj.pk] = depth
+        else:
+            depth_reference[self.obj.pk] = depth
         for i in childrens:
             # print(i)
             if i in self.excluded_childrens: continue
@@ -191,12 +206,15 @@ class SerializableInstance(BaseSerializableInstance):
                 si = self.__class__(child,
                                     excluded_fields=self.excluded_fields,
                                     duplicate=self.duplicate)
-                si.serialize_tree()
+                si.serialize_tree(depth=depth+1, depth_reference=depth_reference)
                 si.dict['related_field'] = related_field
                 if self.duplicate:
                     si.remove_related_field(related_field)
                 d.append(si.dict)
             self.dict['childrens'].extend(d)
+        self.dict['depth'] = depth
+        self.dict['save'] = True
+        self.depth_reference = depth_reference
         return self.dict
 
     def __str__(self):
@@ -205,9 +223,8 @@ class SerializableInstance(BaseSerializableInstance):
     def __repr__(self):
         return self.__str__()
 
-
 class ImportableSerializedInstance(BaseSerializableInstance):
-    
+
     def __init__(self, serialized_obj):
         if isinstance(serialized_obj, dict):
             self.dict = serialized_obj
@@ -241,53 +258,79 @@ class ImportableSerializedInstance(BaseSerializableInstance):
                 getattr(obj, m2m_key).add(m2m_child_obj)
                 print('saved m2m: {} {} ({})'.format(m2m_app_name, m2m_model_name,obj))
 
-    def save_object(self, obj_dict, parent_obj=None):
+    def save_object(self,
+                    obj_dict,
+                    parent_obj=None,
+                    parent_related={},
+                    force=False,
+                    custom_values={}):
         """
         saves the single instance
         if parents: checks if children object has parent_name(key):None
         then made substitutes None with parent object if available, otherwise save without them
         returns ORM model object
         """
-        app_name = obj_dict['app_name']
-        model_name = obj_dict['model_name']
-        model_obj = self.app_model(app_name, model_name)
+        if obj_dict['save']:
+            app_name = obj_dict['app_name']
+            model_name = obj_dict['model_name']
+            model_obj = self.app_model(app_name, model_name)
 
-        # se uno degli attributi ha oggetti innestati e type == m2m rimuovere attr, salvare e usare .add() sull'obj salvato per aggiungere gli m2m
-        # move m2m definition to a private collection and then purge them from original object
-        m2ms = { i:[e for e in obj_dict['object'][i]] for i in obj_dict['m2m']}
+            # se uno degli attributi ha oggetti innestati e type == m2m rimuovere attr, salvare e usare .add() sull'obj salvato per aggiungere gli m2m
+            # move m2m definition to a private collection and then purge them from original object
+            m2ms = { i:[e for e in obj_dict['object'][i]] for i in obj_dict['m2m']}
 
-        # relation to the father
-        if parent_obj:
-            obj_dict['object'][obj_dict['related_field']] = parent_obj
+            # relation to the father
+            if parent_obj:
+                obj_dict['object'][obj_dict['related_field']] = parent_obj
 
-        # save obj without optional m2m
-        print('saving:', obj_dict['object'])
-        # detect and fetch fk
-        save_dict=self.get_save_dict(model_obj, obj_dict)
-        obj = model_obj.objects.filter(**save_dict).last()
-        if not obj:
-            obj = model_obj.objects.create(**save_dict)
-        print('saved: {} {} ({})'.format(app_name, model_name,obj))
+            # save obj without optional m2m
+            print('saving:', obj_dict['object'])
+            # detect and fetch fk
+            save_dict=self.get_save_dict(model_obj, obj_dict)
+            obj = model_obj.objects.filter(**save_dict).last()
 
-        # save each m2m
-        self.save_m2m(obj, m2ms)
+            if not obj or force:
 
-        # ricorsione per childrens qui
-        for child in obj_dict['childrens']:
-            self.save_object(child, parent_obj=obj)
-        
-        return obj
+                obj = model_obj.objects.create(**save_dict)
+
+                for k,v in parent_related.items():
+                    if k != obj_dict['related_field']:
+                        setattr(obj, k, v)
+                        obj.save()
+
+                for k,v in custom_values.items():
+                    setattr(obj, k, v)
+                    obj.save()
+
+                print('saved: {} {} ({})'.format(app_name, model_name, obj.__dict__))
+                print()
+
+                # save each m2m
+                self.save_m2m(obj, m2ms)
+
+                if obj_dict.get('related_field'):
+                    parent_related[obj_dict['related_field']] = getattr(obj, obj_dict['related_field'], None)
+
+                # ricorsione per childrens qui
+                for child in obj_dict['childrens']:
+                    self.save_object(child, parent_obj=obj, parent_related=parent_related)
+
+            return obj
 
     @transaction.atomic
-    def save(self):
+    def save(self, custom_values={}):
         """
         save all the object tree in a transaction
         """
         # save_object and pass it in parents=[] for every children
-        obj = self.save_object(self.dict)
+        obj = self.save_object(obj_dict=self.dict,
+                               force=True,
+                               custom_values=custom_values)
         # for every children
         if not self.dict['childrens']: return obj
         for child in self.dict['childrens']:
-            self.save_object(child, obj)
+            self.save_object(obj_dict=child,
+                             parent_obj=obj,
+                             custom_values=custom_values)
 
         return obj
