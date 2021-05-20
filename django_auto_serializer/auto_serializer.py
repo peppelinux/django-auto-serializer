@@ -258,64 +258,65 @@ class ImportableSerializedInstance(BaseSerializableInstance):
                 getattr(obj, m2m_key).add(m2m_child_obj)
                 print('saved m2m: {} {} ({})'.format(m2m_app_name, m2m_model_name,obj))
 
-    def save_object(self,
-                    obj_dict,
-                    parent_obj=None,
-                    parent_related={},
-                    force=False,
-                    custom_values={}):
+    def save_object(self, obj_dict, custom_values={}, **kwargs):
         """
         saves the single instance
         if parents: checks if children object has parent_name(key):None
         then made substitutes None with parent object if available, otherwise save without them
         returns ORM model object
         """
-        if obj_dict['save']:
-            app_name = obj_dict['app_name']
-            model_name = obj_dict['model_name']
-            model_obj = self.app_model(app_name, model_name)
+        app_name = obj_dict['app_name']
+        model_name = obj_dict['model_name']
+        model_obj = self.app_model(app_name, model_name)
 
-            # se uno degli attributi ha oggetti innestati e type == m2m rimuovere attr, salvare e usare .add() sull'obj salvato per aggiungere gli m2m
-            # move m2m definition to a private collection and then purge them from original object
-            m2ms = { i:[e for e in obj_dict['object'][i]] for i in obj_dict['m2m']}
+        # kwargs
+        related_fields = kwargs.get('related_fields', {})
+        parent_obj = kwargs.get('parent_obj', None)
 
-            # relation to the father
-            if parent_obj:
-                obj_dict['object'][obj_dict['related_field']] = parent_obj
+        # se uno degli attributi ha oggetti innestati e type == m2m rimuovere attr, salvare e usare .add() sull'obj salvato per aggiungere gli m2m
+        # move m2m definition to a private collection and then purge them from original object
+        m2ms = { i:[e for e in obj_dict['object'][i]] for i in obj_dict['m2m']}
 
-            # save obj without optional m2m
-            print('saving:', obj_dict['object'])
-            # detect and fetch fk
-            save_dict=self.get_save_dict(model_obj, obj_dict)
-            obj = model_obj.objects.filter(**save_dict).last()
+        # relation to the father
+        if parent_obj:
+            obj_dict['object'][obj_dict['related_field']] = parent_obj
 
-            if not obj or force:
+        # save obj without optional m2m
+        print('saving:', obj_dict['object'])
+        # detect and fetch fk
+        save_dict=self.get_save_dict(model_obj, obj_dict)
+        # obj = model_obj.objects.filter(**save_dict).last()
 
-                obj = model_obj.objects.create(**save_dict)
+        # if not obj or force:
 
-                for k,v in parent_related.items():
-                    if k != obj_dict['related_field']:
-                        setattr(obj, k, v)
-                        obj.save()
+        obj = model_obj.objects.create(**save_dict)
 
-                for k,v in custom_values.items():
-                    setattr(obj, k, v)
-                    obj.save()
+        for k,v in related_fields.items():
+            if k == obj_dict.get('related_field'): continue
+            setattr(obj, k, v)
+            obj.save()
 
-                print('saved: {} {} ({})'.format(app_name, model_name, obj.__dict__))
-                print()
+        for k,v in custom_values.items():
+            setattr(obj, k, v)
+            obj.save()
 
-                # save each m2m
-                self.save_m2m(obj, m2ms)
+        print('saved: {} {} ({})'.format(app_name, model_name, obj.__dict__))
+        print()
 
-                if obj_dict.get('related_field'):
-                    parent_related[obj_dict['related_field']] = getattr(obj, obj_dict['related_field'], None)
+        # save each m2m
+        self.save_m2m(obj, m2ms)
 
-                # ricorsione per childrens qui
-                for child in obj_dict['childrens']:
-                    self.save_object(child, parent_obj=obj, parent_related=parent_related)
+        if obj_dict.get('related_field'):
+            related_fields[obj_dict['related_field']] = getattr(obj, obj_dict['related_field'])
 
-            return obj
+        # ricorsione per childrens qui
+        for child in obj_dict['childrens']:
+            if child['save']:
+                self.save_object(child,
+                                 custom_values=custom_values,
+                                 parent_obj=obj,
+                                 related_fields=related_fields)
+        return obj
 
     @transaction.atomic
     def save(self, custom_values={}):
@@ -324,13 +325,12 @@ class ImportableSerializedInstance(BaseSerializableInstance):
         """
         # save_object and pass it in parents=[] for every children
         obj = self.save_object(obj_dict=self.dict,
-                               force=True,
                                custom_values=custom_values)
         # for every children
-        if not self.dict['childrens']: return obj
-        for child in self.dict['childrens']:
-            self.save_object(obj_dict=child,
-                             parent_obj=obj,
-                             custom_values=custom_values)
+        # if not self.dict['childrens']: return obj
+        # for child in self.dict['childrens']:
+            # self.save_object(obj_dict=child,
+                             # parent_obj=obj,
+                             # custom_values=custom_values)
 
         return obj
