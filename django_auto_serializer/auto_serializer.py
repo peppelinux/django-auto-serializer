@@ -258,7 +258,11 @@ class ImportableSerializedInstance(BaseSerializableInstance):
                 getattr(obj, m2m_key).add(m2m_child_obj)
                 print('saved m2m: {} {} ({})'.format(m2m_app_name, m2m_model_name,obj))
 
-    def save_object(self, obj_dict, custom_values={}, **kwargs):
+    def save_object(self,
+                    obj_dict,
+                    custom_values={},
+                    recursive_custom_values={},
+                    **kwargs):
         """
         saves the single instance
         if parents: checks if children object has parent_name(key):None
@@ -300,6 +304,10 @@ class ImportableSerializedInstance(BaseSerializableInstance):
             setattr(obj, k, v)
             obj.save()
 
+        for k,v in recursive_custom_values.items():
+            setattr(obj, k, v)
+            obj.save()
+
         print('saved: {} {} ({})'.format(app_name, model_name, obj.__dict__))
         print()
 
@@ -313,19 +321,20 @@ class ImportableSerializedInstance(BaseSerializableInstance):
         for child in obj_dict['childrens']:
             if child['save']:
                 self.save_object(child,
-                                 custom_values=custom_values,
+                                 recursive_custom_values=recursive_custom_values,
                                  parent_obj=obj,
                                  related_fields=related_fields)
         return obj
 
     @transaction.atomic
-    def save(self, custom_values={}):
+    def save(self, custom_values={}, recursive_custom_values={}):
         """
         save all the object tree in a transaction
         """
         # save_object and pass it in parents=[] for every children
         obj = self.save_object(obj_dict=self.dict,
-                               custom_values=custom_values)
+                               custom_values=custom_values,
+                               recursive_custom_values=recursive_custom_values)
         # for every children
         # if not self.dict['childrens']: return obj
         # for child in self.dict['childrens']:
