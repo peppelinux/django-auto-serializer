@@ -19,14 +19,14 @@ pip install git+https://github.com/peppelinux/django-auto-serializer.git
 
 ## Usage Example
 ````
-from cms.menus.models import *
+from my_app.models import MyModel
 
 # get an object
-menu = NavigationBar.objects.first()
+myObj = MyModel.objects.first()
 
 # object serialization
 # A single object duplication
-si = SerializableInstance(menu)
+si = SerializableInstance(myObj)
 
 #si.serialize_obj()
 si.serialize_tree()
@@ -34,9 +34,9 @@ si.remove_duplicates()
 # pprint(si.dict)
 
 # Serialized entire tree, main object with childrens
-si = SerializableInstance(menu,
-                          excluded_fields=['created', 'modified'],
-                          excluded_childrens = ['pagemenu'],
+si = SerializableInstance(myObj,
+                          excluded_fields=['field1', 'field2'],
+                          excluded_childrens = ['relatedObjClass1', 'relatedObjClass2'],
                           auto_fields = False,
                           change_uniques = True,
                           duplicate = True)
@@ -48,11 +48,11 @@ si.remove_duplicates()
 ````
 import pprint
 # all the fields
-bando._meta._forward_fields_map
+myObj._meta._forward_fields_map
 
 # childrens here
-bando._meta.fields_map
-bando._meta.related_objects
+myObj._meta.fields_map
+myObj._meta.related_objects
 
 # another way with NestedObjects
 from django.contrib.admin.utils import NestedObjects
@@ -60,14 +60,14 @@ from django.db import DEFAULT_DB_ALIAS
 
 # get json with pk and autofilled fields as they are
 from django.core import serializers
-serializers.serialize('json', [bando], ensure_ascii=False)
+serializers.serialize('json', [myObj], ensure_ascii=False)
 
 # serializers.serialize() relies on
-model_to_dict(bando)
+model_to_dict(myObj)
 
 pprint(sit.dict)
 for i in sit.dict['childrens']:
-    if i['model_name'] == 'IndicatorePonderato':
+    if i['model_name'] == 'ClassName':
         pprint(i)
 
 tree_to_str = json.dumps(si.dict, indent=2)
@@ -88,11 +88,11 @@ print(isi.json())
 def import_file(request):
     file_to_import = request.FILES.get('file_to_import')
     # content here
-    url = reverse('admin:gestione_peo_bando_changelist')
+    url = reverse('admin:my_django_admin_url')
     if not file_to_import:
         return HttpResponseRedirect(url)
     if not file_to_import:
-        # scrivi un messaggio di errore
+        # error message here
         pass
     jcont = json.loads(request.FILES['file_to_import'].read().decode(settings.DEFAULT_CHARSET))
     isi = ImportableSerializedInstance(jcont)
@@ -111,59 +111,60 @@ from django.contrib.admin.models import LogEntry, ADDITION, CHANGE
 from django.contrib.contenttypes.models import ContentType
 from django.http.response import HttpResponse
 
-from .models import *
 from django_auto_serializer.auto_serializer import (SerializableInstance,
                                                     ImportableSerializedInstance)
 
+from .models import *
 
-def duplica_bando(modeladmin, request, queryset):
-    for bando in queryset:
+
+def my_clone_func(modeladmin, request, queryset):
+    for myObj in queryset:
         try:
-            si = SerializableInstance(bando)
+            si = SerializableInstance(myObj)
             si.serialize_tree()
             si.remove_duplicates()
         except Exception as e:
-            msg = '{} duplicazione fallita: {}'
+            msg = '{} cloning failed: {}'
             messages.add_message(request, messages.WARNING,
-                                 msg.format(bando, e))
+                                 msg.format(myObj, e))
         try:
             isi = ImportableSerializedInstance(si.dict)
             isi.save()
         except Exception as e:
-            msg = '{} duplicazione fallita: {}'
+            msg = '{} cloning failed: {}'
             messages.add_message(request, messages.WARNING,
-                                 msg.format(bando, e))
+                                 msg.format(myObj, e))
 
-        msg = '{} correttamente duplicato.'
+        msg = '{} successfully cloned.'
         messages.add_message(request, messages.INFO,
-                             msg.format(bando))
-duplica_bando.short_description = "Duplica il Bando e la sua Configurazione"
+                             msg.format(myObj))
+my_clone_func.short_description = "Clone object and its configuration"
 
 
-def scarica_template_bando(modeladmin, request, queryset):
+def download_obj_template(modeladmin, request, queryset):
     iofile = io.StringIO()
-    bandi_labels = []
-    for bando in queryset:
+    obj_labels = []
+    for myObj in queryset:
         try:
-            si = SerializableInstance(bando)
+            si = SerializableInstance(myObj)
             st = si.serialize_tree()
             iofile.write(json.dumps(si.dict, indent=2))
         except Exception as e:
-            msg = '{} duplicazione fallita: {}'
+            msg = '{} cloning failed: {}'
             messages.add_message(request, messages.WARNING,
-                                 msg.format(bando, e))
-        bandi_labels.append(bando.slug)
-    file_name = 'peo_template_bando_{}.json'.format('_'.join(bandi_labels))
+                                 msg.format(myObj, e))
+        obj_labels.append(myObj.__str__())
+    file_name = 'my_export{}.json'.format('_'.join(obj_labels))
     iofile.seek(0)
     response = HttpResponse(iofile.read())
     response['content_type'] = 'application/force-download'
     response['Content-Disposition'] = 'attachment; filename={}'.format(file_name)
     response['X-Sendfile'] = file_name
     return response
-scarica_template_bando.short_description = "Scarica Template Bando"
+download_obj_template.short_description = "Download object json template"
 ````
 
-## Result
+## Result (from a real NavigationBar object with items and items childs)
 ````
 {'source_pk': 83,
  'app_name': 'cmsmenus',
