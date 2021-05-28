@@ -77,7 +77,7 @@ class SerializableInstance(BaseSerializableInstance):
 
         self.dict = {
             'source_pk': obj.pk, # source object pk
-            # primary key field name
+            # if the object has to be cloned
             'duplicate': duplicate,
             'app_name': obj._meta.app_label,
             'model_name': obj._meta.object_name,
@@ -304,12 +304,14 @@ class ImportableSerializedInstance(BaseSerializableInstance):
 
         print(save_dict)
 
-        # if no duplication
+        # if duplication create new object
         if obj_dict.get('duplicate'):
             obj = model_obj.objects.create(**save_dict)
-        # else create new object
+        # else update existent object with dict data
         else:
             obj = model_obj.objects.get(pk=obj_dict.get('source_pk'))
+            obj.__dict__.update(**save_dict)
+            obj.save()
 
         # save parent related fields (if object hasn't them)
         for k,v in related_fields.items():
