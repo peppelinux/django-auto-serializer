@@ -286,7 +286,7 @@ class ImportableSerializedInstance(BaseSerializableInstance):
         model_obj = self.app_model(app_name, model_name)
 
         # kwargs
-        related_fields = kwargs.get('related_fields', {})
+        related_fields = kwargs.get('related_fields', {}).copy()
         parent_obj = kwargs.get('parent_obj', None)
 
         # se uno degli attributi ha oggetti innestati e type == m2m rimuovere attr, salvare e usare .add() sull'obj salvato per aggiungere gli m2m
@@ -316,6 +316,7 @@ class ImportableSerializedInstance(BaseSerializableInstance):
         # save parent related fields (if object hasn't them)
         for k,v in related_fields.items():
             if k == obj_dict.get('related_field'): continue
+            # if k not in obj_dict['object']: continue
             setattr(obj, k, v)
             obj.save()
 
