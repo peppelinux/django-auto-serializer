@@ -5,7 +5,7 @@ def readme():
         return f.read()
 
 setup(name='django-auto-serializer',
-      version='0.4',
+      version='0.4.1',
       description="Django app that automates objects tree serialization recursively, wihtout any declaration",
       long_description=readme(),
       classifiers=['Development Status :: 5 - Production/Stable',

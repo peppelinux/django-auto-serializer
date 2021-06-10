@@ -74,7 +74,6 @@ class SerializableInstance(BaseSerializableInstance):
         self.duplicate = duplicate
         self.excluded_childrens = excluded_childrens
 
-
         self.dict = {
             'source_pk': obj.pk, # source object pk
             # if the object has to be cloned
@@ -82,6 +81,7 @@ class SerializableInstance(BaseSerializableInstance):
             'app_name': obj._meta.app_label,
             'model_name': obj._meta.object_name,
             'object': {},
+            'fields': [],
             'm2m': [], # lists m2m field names
             # 'related_field' : None # this is need only for children obj
             # these will be added in Serialized Tree
@@ -170,6 +170,7 @@ class SerializableInstance(BaseSerializableInstance):
             if field in self.excluded_fields: continue
 
             value = self.get_serialized_value(self.obj, self.fields[field])
+            self.dict['fields'].append(field)
             if value:
                 self.dict['object'][field] = value
         return self.dict
@@ -199,7 +200,8 @@ class SerializableInstance(BaseSerializableInstance):
         else:
             depth_reference[self.obj.pk] = depth
         for i in childrens:
-            if i in self.excluded_childrens: continue
+            if i in self.excluded_childrens:
+                continue
             related_field = childrens[i].field.name
             method = getattr(childrens[i], 'get_accessor_name')
             method_name = method()
@@ -212,6 +214,7 @@ class SerializableInstance(BaseSerializableInstance):
             for child in children_items:
                 si = self.__class__(child,
                                     excluded_fields=self.excluded_fields,
+                                    excluded_childrens=self.excluded_childrens,
                                     duplicate=self.duplicate)
                 si.serialize_tree(depth=depth+1, depth_reference=depth_reference)
                 si.dict['related_field'] = related_field
@@ -304,6 +307,13 @@ class ImportableSerializedInstance(BaseSerializableInstance):
 
         print(save_dict)
 
+        save_dict.update(custom_values)
+
+        # save recursive custom values
+        for k,v in recursive_custom_values.items():
+            if k in obj_dict['fields']:
+                save_dict[k] = v
+
         # if duplication create new object
         if obj_dict.get('duplicate'):
             obj = model_obj.objects.create(**save_dict)
@@ -317,16 +327,6 @@ class ImportableSerializedInstance(BaseSerializableInstance):
         for k,v in related_fields.items():
             if k == obj_dict.get('related_field'): continue
             # if k not in obj_dict['object']: continue
-            setattr(obj, k, v)
-            obj.save()
-
-        # save custom values
-        for k,v in custom_values.items():
-            setattr(obj, k, v)
-            obj.save()
-
-        # save recursive custom values
-        for k,v in recursive_custom_values.items():
             setattr(obj, k, v)
             obj.save()
 
