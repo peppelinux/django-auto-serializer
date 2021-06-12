@@ -5,8 +5,8 @@ def readme():
         return f.read()
 
 setup(name='django-auto-serializer',
-      version='0.4.1',
-      description="Django app that automates objects tree serialization recursively, wihtout any declaration",
+      version='0.4.2',
+      description="Django app that automates objects tree serialization recursively",
       long_description=readme(),
       classifiers=['Development Status :: 5 - Production/Stable',
                   'License :: OSI Approved :: BSD License',
