@@ -175,7 +175,7 @@ class SerializableInstance(BaseSerializableInstance):
                 self.dict['object'][field] = value
         return self.dict
 
-    def remove_duplicates(self, tree={}, depth=0):
+    def remove_duplicates(self, tree={}):
         """
         if an object has multiple same class foreign keys,
         it appears more times in the tree dict!
@@ -186,19 +186,21 @@ class SerializableInstance(BaseSerializableInstance):
         if not tree: tree=self.dict
         childrens = tree['childrens']
         for child in childrens:
-            self.remove_duplicates(tree=child, depth=depth+1)
-            if child['source_pk'] in self.depth_reference:
-                if child['depth'] < self.depth_reference[child['source_pk']]:
+            self.remove_duplicates(tree=child)
+            key = f'{child["app_name"]}_{child["model_name"]}_{child["source_pk"]}'
+            if key in self.depth_reference:
+                if child['depth'] < self.depth_reference[key]:
                     child['save'] = False
 
     def serialize_tree(self, depth=0, depth_reference={}):
         self.serialize_obj()
         childrens = self.childrens()
-        if self.obj.pk in depth_reference:
-            if depth > depth_reference[self.obj.pk]:
-                depth_reference[self.obj.pk] = depth
+        key = f'{self.obj._meta.app_label}_{self.obj._meta.object_name}_{self.obj.pk}'
+        if key in depth_reference:
+            if depth > depth_reference[key]:
+                depth_reference[key] = depth
         else:
-            depth_reference[self.obj.pk] = depth
+            depth_reference[key] = depth
         for i in childrens:
             if i in self.excluded_childrens:
                 continue

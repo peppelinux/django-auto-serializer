@@ -6,7 +6,7 @@ with open(os.path.join(os.path.dirname(__file__), 'README.md')) as readme:
     README = readme.read()
 
 setup(name='django-auto-serializer',
-    version='0.4.2',
+    version='0.4.3',
     description="Django app that automates objects tree serialization recursively",
     long_description=README,
     long_description_content_type='text/markdown',
