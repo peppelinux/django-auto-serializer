@@ -92,17 +92,18 @@ class SerializableInstance(BaseSerializableInstance):
         """
 
         """
+        value = ofield.value_from_object(obj)
         # everything to string for the first time
-        value = ofield.value_to_string(obj)
+
 
         # better specification for numeric types
-        if type(ofield) in (BooleanField,
-                            NullBooleanField,
-                            IntegerField,
-                            FloatField,
-                            PositiveIntegerField,
-                            ForeignKey):
-            value = ofield.value_from_object(obj)
+        if type(ofield) not in (BooleanField,
+                                NullBooleanField,
+                                IntegerField,
+                                FloatField,
+                                PositiveIntegerField,
+                                ForeignKey) and value != None:
+            value = ofield.value_to_string(obj)
         # specify others types here if needed
         #
 
